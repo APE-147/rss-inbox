@@ -8,6 +8,7 @@ from typing import Dict, Optional
 from .plugins.actions import AppleScriptAction, SingleFileAction, VideoDownloaderAction
 from .config import Config, load_config, save_config, create_example_config
 from .core.feeds import FeedProcessor
+from .services.cookies import CookieManager
 from .services.state import StateManager
 from .utils.paths import get_project_dir
 
@@ -38,12 +39,32 @@ class RSSInboxApp:
         # Initialize components
         self.state_manager = StateManager()
         self.feed_processor = FeedProcessor(self.config, self.state_manager)
+
+        actions_config = self.config.actions
+        self.cookie_manager = CookieManager(
+            cache_dir=Path(actions_config.cookie_cache_dir),
+            temp_dir=Path(actions_config.cookie_temp_dir),
+            cookie_update_project_dir=(
+                Path(actions_config.cookie_update_project_dir)
+                if actions_config.cookie_update_project_dir
+                else None
+            ),
+            enable_remote_fetch=bool(actions_config.cookie_remote_fetch),
+        )
         
         # Initialize actions
         self.actions = {
-            "singlefile": SingleFileAction(self.config.actions, self.state_manager),
+            "singlefile": SingleFileAction(
+                self.config.actions,
+                self.state_manager,
+                self.cookie_manager,
+            ),
             "applescript": AppleScriptAction(self.config.actions, self.state_manager),
-            "video_downloader": VideoDownloaderAction(self.config.actions, self.state_manager),
+            "video_downloader": VideoDownloaderAction(
+                self.config.actions,
+                self.state_manager,
+                self.cookie_manager,
+            ),
         }
         
         logging.info("RSS Inbox initialized")

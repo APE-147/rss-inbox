@@ -8,18 +8,25 @@ from typing import Any, Dict, List, Optional
 
 from ..config import ActionConfig
 from ..core.feeds import FeedEntry
+from ..services.cookies import CookieBundle, CookieManager
 from ..services.state import StateManager
 
 
 class SingleFileAction:
     """Action to save webpages using SingleFile CLI."""
     
-    def __init__(self, config: ActionConfig, state_manager: Optional[StateManager] = None):
+    def __init__(
+        self,
+        config: ActionConfig,
+        state_manager: Optional[StateManager] = None,
+        cookie_manager: Optional[CookieManager] = None,
+    ):
         """Initialize SingleFile action."""
         self.config = config
         self.output_dir = Path(config.singlefile_output_dir).expanduser()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.state_manager = state_manager
+        self.cookie_manager = cookie_manager
     
     def execute(self, entry: FeedEntry, dry_run: bool = False, verbose: bool = False) -> bool:
         """Execute SingleFile action for an entry."""
@@ -44,9 +51,19 @@ class SingleFileAction:
         dest_output_dir = Path(output_base).expanduser()
         dest_output_dir.mkdir(parents=True, exist_ok=True)
 
+        skip_cookie_lookup = bool(
+            entry.custom_params.get("singlefile_skip_cookie_lookup")
+        ) if entry.custom_params else False
+
         # Build command
         prefer_override = entry.custom_params.get("singlefile_prefer") if entry.custom_params else None
-        cmd = self._build_command(entry.link, dest_output_dir, prefer_override, entry.custom_params)
+        cmd = self._build_command(
+            entry.link,
+            dest_output_dir,
+            prefer_override,
+            entry.custom_params,
+            skip_cookie_lookup=skip_cookie_lookup,
+        )
         
         if dry_run:
             logging.info(f"[DRY RUN] Would execute SingleFile command:")
@@ -94,6 +111,8 @@ class SingleFileAction:
         output_dir: Path,
         prefer_override: Optional[str],
         custom_params: Optional[Dict[str, Any]],
+        *,
+        skip_cookie_lookup: bool = False,
     ) -> List[str]:
         """Build command for SingleFile archiving."""
         custom_params = custom_params or {}
@@ -109,6 +128,7 @@ class SingleFileAction:
         cookies_path: Optional[Path] = None
         cli_cookie_args: List[str] = []
         legacy_cookie_args: List[str] = []
+        cookie_bundle: Optional[CookieBundle] = None
 
         if cookies_path_value:
             candidate = Path(cookies_path_value).expanduser()
@@ -118,6 +138,15 @@ class SingleFileAction:
                 legacy_cookie_args = ["--browser-cookies-file", str(candidate)]
             else:
                 logging.warning(f"Cookies file not found, ignoring: {candidate}")
+        elif self.cookie_manager and not skip_cookie_lookup:
+            cookie_bundle = self.cookie_manager.get_bundle_for_url(url)
+            if cookie_bundle and cookie_bundle.singlefile_cookie_file:
+                cookies_path = cookie_bundle.singlefile_cookie_file
+                cli_cookie_args = ["--cookies-file", str(cookies_path)]
+                legacy_cookie_args = ["--browser-cookies-file", str(cookies_path)]
+                logging.debug(
+                    "Using cookie bundle (%s) for %s", cookie_bundle.source, cookie_bundle.domain
+                )
 
         if prefer in {"bin", "auto"} and bin_path.exists():
             cmd = [
@@ -287,10 +316,16 @@ class AppleScriptAction:
 class VideoDownloaderAction:
     """Action that forwards video URLs to the Downie dispatcher script."""
 
-    def __init__(self, config: ActionConfig, state_manager: Optional[StateManager] = None):
+    def __init__(
+        self,
+        config: ActionConfig,
+        state_manager: Optional[StateManager] = None,
+        cookie_manager: Optional[CookieManager] = None,
+    ):
         self.config = config
         self.default_script_path = self._resolve_script_path(config.video_downloader_script)
         self.state_manager = state_manager
+        self.cookie_manager = cookie_manager
 
     def _resolve_script_path(self, script_path: str) -> Path:
         path = Path(script_path).expanduser()
@@ -308,6 +343,14 @@ class VideoDownloaderAction:
             logging.warning(f"No link found for entry: {entry.title}")
             self._record_failure(entry, "missing link")
             return False
+
+        skip_cookie_lookup = bool(
+            entry.custom_params.get("video_downloader_skip_cookie_lookup")
+        ) if entry.custom_params else False
+
+        cookie_bundle: Optional[CookieBundle] = None
+        if not skip_cookie_lookup and self.cookie_manager:
+            cookie_bundle = self.cookie_manager.get_bundle_for_url(entry.link)
 
         script_override = entry.custom_params.get("video_downloader_script") if entry.custom_params else None
         python_override = entry.custom_params.get("video_downloader_python") if entry.custom_params else None
@@ -349,6 +392,22 @@ class VideoDownloaderAction:
             "feed_url": entry.feed_url,
             "feed_name": entry.feed_name or "",
         }
+        if cookie_bundle:
+            mapping.update({
+                "cookie_header": cookie_bundle.cookie_header or "",
+                "cookie_file": str(cookie_bundle.singlefile_cookie_file) if cookie_bundle.singlefile_cookie_file else "",
+                "cookie_json": str(cookie_bundle.singlefile_cookie_file) if cookie_bundle.singlefile_cookie_file else "",
+                "cookie_domain": cookie_bundle.domain,
+                "cookie_source": cookie_bundle.source,
+            })
+        else:
+            mapping.update({
+                "cookie_header": "",
+                "cookie_file": "",
+                "cookie_json": "",
+                "cookie_domain": "",
+                "cookie_source": "",
+            })
         # Allow lightweight templating with additional custom params
         if entry.custom_params:
             for key, value in entry.custom_params.items():
@@ -358,6 +417,26 @@ class VideoDownloaderAction:
         resolved_args = [arg.format(**mapping) for arg in template]
         if not any("{url}" in arg for arg in template):
             resolved_args.append(entry.link)
+
+        def _has_flag(args: List[str], flag: str) -> bool:
+            return any(item == flag or item.startswith(f"{flag}=") for item in args)
+
+        if cookie_bundle and not skip_cookie_lookup:
+            cookie_path = cookie_bundle.singlefile_cookie_file
+            if cookie_path and not _has_flag(resolved_args, "--cookie-json"):
+                resolved_args.extend(["--cookie-json", str(cookie_path)])
+                logging.debug(
+                    "Attached cookie json for video downloader (%s -> %s)",
+                    cookie_bundle.domain,
+                    cookie_bundle.source,
+                )
+            elif cookie_bundle.cookie_header and not _has_flag(resolved_args, "--cookie"):
+                resolved_args.extend(["--cookie", cookie_bundle.cookie_header])
+                logging.debug(
+                    "Attached cookie header for video downloader (%s -> %s)",
+                    cookie_bundle.domain,
+                    cookie_bundle.source,
+                )
 
         timeout = int(timeout_override or self.config.video_downloader_timeout)
 

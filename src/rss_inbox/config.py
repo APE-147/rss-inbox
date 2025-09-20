@@ -125,6 +125,10 @@ class ActionConfig(BaseModel):
     singlefile_prefer: str = Field(default="bin", description="bin|module|legacy")
     singlefile_archive_output_dir: Optional[str] = "/Users/niceday/Developer/Cloud/Dropbox/-File-/Archive/Web"
     singlefile_cookies_file: Optional[str] = "/Users/niceday/Developer/cookie/singlefile/xcom.cookies.json"
+    cookie_cache_dir: str = "/Users/niceday/Developer/cookie"
+    cookie_temp_dir: str = "~/.cache/rss-inbox/cookies"
+    cookie_update_project_dir: Optional[str] = "/Users/niceday/Developer/Cloud/Dropbox/-Code-/Scripts/desktop/info/cookie-update"
+    cookie_remote_fetch: bool = True
 
     # AppleScript
     applescript_file: str = "applescripts/handle_video.applescript"
@@ -148,6 +152,16 @@ class ActionConfig(BaseModel):
 
     @validator('singlefile_cookies_file')
     def expand_cookies_file(cls, v):
+        if not v:
+            return None
+        return str(Path(v).expanduser())
+
+    @validator('cookie_cache_dir', 'cookie_temp_dir')
+    def expand_cookie_dirs(cls, v: str) -> str:
+        return str(Path(v).expanduser())
+
+    @validator('cookie_update_project_dir')
+    def expand_cookie_update_dir(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             return None
         return str(Path(v).expanduser())
