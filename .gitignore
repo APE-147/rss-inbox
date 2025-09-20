@@ -1,0 +1,168 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+.env.local
+.env.production
+.env.staging
+.env.development
+config.local.yaml
+config.local.yml
+secrets.yaml
+secrets.yml
+*secret*
+*credential*
+*auth*
+*.key
+*.pem
+*.crt
+api_keys.txt
+
+# RSS/Feed data and caches
+data/
+feeds/
+rss_cache/
+feed_cache/
+*.rss
+*.xml.bak
+feed_data/
+processed_feeds/
+
+# Logs and debugging
+*.log
+logs/
+debug.log
+error.log
+rss_inbox.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+htmlcov/
+.cache
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Lock files (keep uv.lock but ignore others)
+Pipfile.lock
+poetry.lock
+# Note: keeping uv.lock as it's the project's chosen lock file
+
+# Local configuration overrides
+config.local.*
+local_config.*
+dev_config.*
+
+# Runtime state and PID files
+*.pid
+*.state
+state.json
+runtime.json
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Service/daemon specific
+*.plist.local
+launchd.local/
+systemd.local/
+
+# Personal configuration files (CRITICAL - DO NOT COMMIT THESE)
+config.yaml
+config.yml
+.project_config.json
+scripts/n8n_*.json
+scripts/*_run.json
+
+# Personal data and runtime directories
+output/
+cache/
+state/
+processed/
+archive/
+
+# Personal environment and user-specific overrides
+*.personal.*
+user_*
+personal_*
+my_*
+
+# Application state and runtime files
+*.state.json
+app_state.*
+user_state.*

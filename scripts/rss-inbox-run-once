@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+VENV_PATH="${PROJECT_ROOT}/.venv/bin/python"
+CONFIG_FILE="${PROJECT_ROOT}/config.yaml"
+
+if [[ ! -x "${VENV_PATH}" ]]; then
+    echo "Error: rss-inbox virtualenv not found at ${PROJECT_ROOT}/.venv" >&2
+    exit 1
+fi
+
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    echo "Error: rss-inbox config not found at ${CONFIG_FILE}" >&2
+    exit 1
+fi
+
+exec "${VENV_PATH}" -m rss_inbox.cli run --config "${CONFIG_FILE}" --once --verbose "$@"
